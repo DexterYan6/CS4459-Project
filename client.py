@@ -46,7 +46,8 @@ class ChatClient:
                     print("\nExiting chat")
                     break
                 
-                self.send_message(self.input_buffer)
+                if self.input_buffer.strip():
+                    self.send_message(self.input_buffer)
                 self.input_buffer = ""
 
         except KeyboardInterrupt:
@@ -54,7 +55,7 @@ class ChatClient:
         finally:
             self.stop_event.set()
             self.channel.close()
-            sys.exit(0)
+            # sys.exit(0)
 
 if __name__ == "__main__":
     try:

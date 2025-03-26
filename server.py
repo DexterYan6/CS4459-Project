@@ -21,7 +21,7 @@ class ChatService(chatservice_pb2_grpc.ChatServiceServicer):
                 lastindex += 1
                 yield message
 
-    def SendMessage(self, request):
+    def SendMessage(self, request, context):
         self.save_history(request)
         print(f"{request.username}: {request.message}")
 
@@ -35,6 +35,7 @@ class ChatService(chatservice_pb2_grpc.ChatServiceServicer):
         }
 
         self.db.messages.insert_one(message_doc)
+        print(message_doc)
 
     def get_chat_history(self):
         chat_history = self.db.messages.find()
