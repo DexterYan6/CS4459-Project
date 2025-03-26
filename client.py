@@ -31,8 +31,8 @@ class ChatClient:
  
                 sys.stdout.write(f"> {self.input_buffer}")
                 sys.stdout.flush()
-        except grpc.RpcError:
-            print("Connection to server lost")
+        except grpc.RpcError as e:
+            print("Connection to server lost" + str(e))
 
     def start_chat(self):
         receive_thread = threading.Thread(target=self.receive_messages)

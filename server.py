@@ -9,8 +9,10 @@ import time
 class ChatService(chatservice_pb2_grpc.ChatServiceServicer):
     def __init__(self):
         # initialize mongodb service, currently on local
-        self.mongo_client = MongoClient('localhost', 27017)
+        mongodb_uri = mongodb_uri = "mongodb+srv://dev:cs4459@cluster0.qs2ghol.mongodb.net/chat_db?retryWrites=true&w=majority"
+        self.mongo_client = MongoClient(mongodb_uri)
         self.db = self.mongo_client.chat_db
+        
 
     def ChatStream(self, request_iterator, context):
         lastindex = 0
