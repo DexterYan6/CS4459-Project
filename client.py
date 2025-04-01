@@ -27,8 +27,15 @@ class ChatClient:
                 
                 sys.stdout.write('\r' + ' ' * (len(self.input_buffer) + 2))
                 sys.stdout.write('\r')
-                print(f"{message.username}: {message.message}")
- 
+
+                if message.username == self.username:
+                    sys.stdout.write(f"You: {message.message}\n")
+                else:
+                    sys.stdout.write(f"{message.username}: {message.message}\n")
+                    
+                #print(f"\r{message.username}: {message.message}")
+                #print("> ", end='', flush=True)
+
                 sys.stdout.write(f"> {self.input_buffer}")
                 sys.stdout.flush()
         except grpc.RpcError:
