@@ -118,24 +118,51 @@ class ChatGUI:
         # self.chat_display.yview("end")
         self.chat_frame._parent_canvas.yview_moveto(1.0)
         
+    # def on_close(self):
+    #     try:
+    #         # Close client connection
+    #         self.chat_client.close()
+
+    #         # ✅ Safely destroy all children of chat_frame
+    #         if hasattr(self, "chat_frame"):
+    #             for child in self.chat_frame.winfo_children():
+    #                 try:
+    #                     child.destroy()
+    #                 except Exception as e:
+    #                     print(f"Child destroy failed: {e}")
+
+    #         # Delay final destroy slightly to let GUI settle
+    #         self.window.after(50, self.window.destroy)
+
+    #     except Exception as e:
+    #         print(f"[on_close] Error: {e}")
+
     def on_close(self):
         try:
-            # Close client connection
+            # 1. Disable the window immediately to prevent new interactions
+            self.window.attributes('-disabled', True)
+            
+            # 2. Cancel any pending after events
+            self.window.after_cancel('all')
+            
+            # 3. Close the client connection
             self.chat_client.close()
+            
+            # 4. Schedule the actual destruction with a small delay
+            self.window.after(100, self._safe_destroy)
+            
+        except Exception:
+            # If anything fails, force quit
+            self.window.quit()
 
-            # ✅ Safely destroy all children of chat_frame
-            if hasattr(self, "chat_frame"):
-                for child in self.chat_frame.winfo_children():
-                    try:
-                        child.destroy()
-                    except Exception as e:
-                        print(f"Child destroy failed: {e}")
-
-            # Delay final destroy slightly to let GUI settle
-            self.window.after(50, self.window.destroy)
-
-        except Exception as e:
-            print(f"[on_close] Error: {e}")
+    def _safe_destroy(self):
+        """Final destruction step that handles any remaining cleanup"""
+        try:
+            # Destroy any remaining widgets if needed
+            if self.window.winfo_exists():
+                self.window.destroy()
+        except Exception:
+            self.window.quit()
 
 
     def run(self):
@@ -155,13 +182,11 @@ if __name__ == "__main__":
         username = dialog.get_input()
         
         if not username:
-            print("No username entered. Exiting.")
-            app.destroy()
-            exit()
-            
+            print("No username entered. Try again.")
+            continue
         try:
             gui = ChatGUI(username)
-            app.destroy()
+            app.quit()
             gui.run()
             break
         except ValueError as e:
