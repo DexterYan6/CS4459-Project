@@ -15,6 +15,7 @@ class ChatClient:
         self.receive_thread = None
         self.input_buffer = ""
         self.on_message_callback = on_message_callback
+        self.connected = False
 
     def send_message(self, message):
         message_request = chatservice_pb2.MessageRequest(username=self.username, message=message)
@@ -69,15 +70,57 @@ class ChatClient:
             self.channel.close()
             # sys.exit(0)
 
+    def check_username_available(self):
+        try:
+            connect_request = chatservice_pb2.MessageRequest(username=self.username, message="")
+
+            metadata = [('message-type', 'connect')]
+            response = self.stub.SendMessage(connect_request, metadata=metadata)
+
+            if response.message.startswith("SUCCESS"):
+                self.connected = True
+                return True
+            return False
+        except grpc.RpcError as e:
+            status_code = e.code()
+            if status_code == grpc.StatusCode.UNAVAILABLE:
+                raise ConnectionError("Chat server is unavailable")
+            return False
+    
+    def disconnect(self):
+        if self.connected:
+            try:
+                disconnect_request = chatservice_pb2.MessageRequest(username=self.username, message="")
+                metadata = [('message-type', 'disconnect')]
+
+                self.stub.SendMessage(disconnect_request, metadata=metadata)
+                self.connected = False
+            except grpc.RpcError:
+                pass
+
     def close(self):
         self.stop_event.set()
-        self.channel.close()
+        try:
+            self.disconnect()
+        except Exception:
+            pass
+        try:
+            self.channel.close()
+        except Exception:
+            pass
 
 if __name__ == "__main__":
     try:
         username = input("Enter your username: ")
         client = ChatClient(username)
-        client.start_chat()
+
+        if client.check_username_available():
+            print('Welcome!')
+            client.start_chat()
+        else:
+            print('Username is already taken.')
+            client.close()
     except KeyboardInterrupt:
         print("\nChat client terminated.")
+        client.disconnect()
         sys.exit(0)

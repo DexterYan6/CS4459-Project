@@ -11,6 +11,7 @@ class ChatService(chatservice_pb2_grpc.ChatServiceServicer):
         # initialize mongodb service, currently on local
         self.mongo_client = MongoClient('localhost', 27017)
         self.db = self.mongo_client.chat_db
+        self.connected_users = set()
 
     def ChatStream(self, request_iterator, context):
         lastindex = 0
@@ -22,13 +23,41 @@ class ChatService(chatservice_pb2_grpc.ChatServiceServicer):
                 yield message
 
     def SendMessage(self, request, context):
+        metadata = dict(context.invocation_metadata())
+        message_type = metadata.get('message-type', 'chat')
+       
+        # Handle connection request
+        if message_type == 'connect':
+            if request.username in self.connected_users:
+                # Username is taken, return error message
+                return chatservice_pb2.MessageResponse(
+                    username="System",
+                    message=f"ERROR: Username '{request.username}' is already taken."
+                )
+            else:
+                # Register the username and return success
+                self.connected_users.add(request.username)
+                return chatservice_pb2.MessageResponse(
+                    username="System",
+                    message=f"SUCCESS: Connected as '{request.username}'."
+                )
+       
+        # Handle disconnection request
+        if message_type == 'disconnect':
+            if request.username in self.connected_users:
+                self.connected_users.remove(request.username)
+            return chatservice_pb2.MessageResponse(
+                username="System",
+                message=f"User '{request.username}' has disconnected."
+            )
+       
         self.save_history(request)
         print(f"{request.username}: {request.message}")
 
         return chatservice_pb2.MessageResponse(username=request.username, message=request.message)
 
     def save_history(self, request):
-        #mongodb insert 
+        #mongodb insert
         message_doc = {
             'message': request.message,
             'user': request.username,

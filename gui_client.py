@@ -19,6 +19,18 @@ class ChatGUI:
         self.username = username
         self.chat_client = ChatClient(username=self.username, on_message_callback=self.display_message)
 
+        try:
+            self.chat_client = ChatClient(username=self.username, on_message_callback=self.display_message)
+            
+            if not self.chat_client.check_username_available():
+                # Handle username already taken
+                mb.showerror("Username Error", f"Username '{username}' is already taken!")
+                raise ValueError(f"Username '{username}' is already taken")
+                
+        except ConnectionError:
+            mb.showerror("Server Error", "Cannot connect to the chatroom. Please try again later.")
+            raise
+
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
 
@@ -132,15 +144,25 @@ class ChatGUI:
 if __name__ == "__main__":
     app = ctk.CTk()
     app.withdraw()  # hide root window temporarily
-
-    dialog = CTkInputDialog(title="Username", text="Enter your username:")
-    username = dialog.get_input()
-
-    if not username:
-        print("No username entered. Exiting.")
-        exit()
-
-    app.destroy()  # destroy temp window
-
-    gui = ChatGUI(username)
-    gui.run()
+    
+    # Set a proper minsize to ensure the window is truly invisible
+    app.minsize(0, 0)
+    app.geometry("0x0")
+    app.overrideredirect(True)  # Remove window decorations
+    
+    while True:
+        dialog = CTkInputDialog(text="Enter your username:", title="Username")
+        username = dialog.get_input()
+        
+        if not username:
+            print("No username entered. Exiting.")
+            app.destroy()
+            exit()
+            
+        try:
+            gui = ChatGUI(username)
+            app.destroy()
+            gui.run()
+            break
+        except ValueError as e:
+            print(f"Error: {e}")
