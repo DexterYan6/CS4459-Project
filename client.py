@@ -5,6 +5,7 @@ from google.protobuf.empty_pb2 import Empty
 
 import sys
 import threading
+import time
 
 class ChatClient:
     def __init__(self, username, on_message_callback=None):
@@ -13,13 +14,55 @@ class ChatClient:
         self.username = username
         self.stop_event = threading.Event()
         self.receive_thread = None
+        self.heartbeat_thread = None
         self.input_buffer = ""
         self.on_message_callback = on_message_callback
         self.connected = False
+        self.is_closing = False
 
     def send_message(self, message):
-        message_request = chatservice_pb2.MessageRequest(username=self.username, message=message)
-        self.stub.SendMessage(message_request)
+        try:
+            message_request = chatservice_pb2.MessageRequest(username=self.username, message=message)
+            response = self.stub.SendMessage(message_request)
+            
+            # Check if server responded with an error about not being connected
+            if response.username == "System" and "not connected" in response.message.lower():
+                self.connected = False
+                if self.on_message_callback:
+                    self.on_message_callback("System", "You are not connected to the server.")
+                return False
+                
+            return True
+        except grpc.RpcError:
+            self.connected = False
+            if self.on_message_callback and not self.is_closing:
+                self.on_message_callback("System", "Server error. Cannot send message.")
+            return False
+
+    def send_heartbeat(self):
+        """Send periodic heartbeats to server"""
+        while not self.stop_event.is_set():
+            try:
+                if self.connected and not self.is_closing:
+                    message_request = chatservice_pb2.MessageRequest(username=self.username, message="")
+                    metadata = [('message-type', 'heartbeat')]
+                    response = self.stub.SendMessage(message_request, metadata=metadata)
+                    
+                    # Check if server indicates we're not connected
+                    if "ERROR:" in response.message:
+                        self.connected = False
+                        if self.on_message_callback:
+                            self.on_message_callback("System", "Connection to server lost")
+                        break
+            except grpc.RpcError:
+                # If we can't send heartbeats, the connection might be down
+                if not self.is_closing and self.connected:
+                    self.connected = False
+                    if self.on_message_callback:
+                        self.on_message_callback("System", "Connection to server lost")
+                break
+
+            time.sleep(15)  # Send heartbeat every 15 seconds
 
     def receive_messages(self):
         try:
@@ -27,30 +70,24 @@ class ChatClient:
                 if self.stop_event.is_set():
                     break
                 
-                # sys.stdout.write('\r' + ' ' * (len(self.input_buffer) + 2))
-                # sys.stdout.write('\r')
-
-                # if message.username == self.username:
-                #     sys.stdout.write(f"You: {message.message}\n")
-                # else:
-                #     sys.stdout.write(f"{message.username}: {message.message}\n")
-                    
-                # #print(f"\r{message.username}: {message.message}")
-                # #print("> ", end='', flush=True)
-
-                # sys.stdout.write(f"> {self.input_buffer}")
-                # sys.stdout.flush()
-
-                if self.on_message_callback:
-                    self.on_message_callback(message.username, message.message)
+                if message.username != "System" or "ERROR:" in message.message:
+                    if self.on_message_callback:
+                        self.on_message_callback(message.username, message.message)
         except grpc.RpcError:
-            if self.on_message_callback:
-                self.on_message_callback("System", "Connection to server lost")
+            if not self.is_closing and self.connected:
+                self.connected = False
+                if self.on_message_callback:
+                    self.on_message_callback("System", "Connection to server lost")
 
     def start_chat(self):
-        receive_thread = threading.Thread(target=self.receive_messages)
-        receive_thread.daemon = True
-        receive_thread.start()
+        self.receive_thread = threading.Thread(target=self.receive_messages)
+        self.receive_thread.daemon = True
+        self.receive_thread.start()
+
+        self.heartbeat_thread = threading.Thread(target=self.send_heartbeat)
+        self.heartbeat_thread.daemon = True
+        self.heartbeat_thread.start()
+        
         try:
             while True:
                 self.input_buffer = input("> ")
@@ -68,7 +105,6 @@ class ChatClient:
         finally:
             self.stop_event.set()
             self.channel.close()
-            # sys.exit(0)
 
     def check_username_available(self):
         try:
@@ -79,6 +115,9 @@ class ChatClient:
 
             if response.message.startswith("SUCCESS"):
                 self.connected = True
+                self.heartbeat_thread = threading.Thread(target=self.send_heartbeat)
+                self.heartbeat_thread.daemon = True
+                self.heartbeat_thread.start()
                 return True
             return False
         except grpc.RpcError as e:
@@ -94,13 +133,13 @@ class ChatClient:
                 metadata = [('message-type', 'disconnect')]
 
                 self.stub.SendMessage(disconnect_request, metadata=metadata)
-                self.connected = False
             except grpc.RpcError:
                 pass
             finally:
                 self.connected = False
 
     def close(self):
+        self.is_closing = True
         self.stop_event.set()
         try:
             self.disconnect()
