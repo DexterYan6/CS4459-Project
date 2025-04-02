@@ -97,6 +97,8 @@ class ChatClient:
                 self.connected = False
             except grpc.RpcError:
                 pass
+            finally:
+                self.connected = False
 
     def close(self):
         self.stop_event.set()

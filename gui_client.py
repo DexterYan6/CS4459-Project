@@ -81,6 +81,16 @@ class ChatGUI:
         # start receiving messages only after full GUI is built
         threading.Thread(target=self.chat_client.receive_messages, daemon=True).start()
 
+        self.window.after(100, self.scroll_to_bottom)
+
+    #when messages are sent, scroll to bottom - not sure why this wasn't happening before
+    def scroll_to_bottom(self):
+        try:
+            self.window.after_idle(lambda: self.chat_frame._parent_canvas.yview_moveto(1.0))
+        except Exception as e:
+            if not self.is_closing:
+                print(f"Error scrolling: {e}")
+
     def on_enter_pressed(self, event=None):
         message = self.input_field.get("0.0","end").strip()
         if message:
@@ -116,7 +126,8 @@ class ChatGUI:
         # self.chat_display.insert("end", f"{display_name}: {message}\n", tag)
         # self.chat_display.configure(state='disabled')
         # self.chat_display.yview("end")
-        self.chat_frame._parent_canvas.yview_moveto(1.0)
+        self.scroll_to_bottom()
+        # self.chat_frame._parent_canvas.yview_moveto(1.0)
         
     # def on_close(self):
     #     try:
@@ -138,22 +149,25 @@ class ChatGUI:
     #         print(f"[on_close] Error: {e}")
 
     def on_close(self):
+        # Set closing flag immediately to prevent new operations
+        self.is_closing = True
+        
+        # First close the chat client
         try:
-            # 1. Disable the window immediately to prevent new interactions
-            self.window.attributes('-disabled', True)
-            
-            # 2. Cancel any pending after events
-            self.window.after_cancel('all')
-            
-            # 3. Close the client connection
-            self.chat_client.close()
-            
-            # 4. Schedule the actual destruction with a small delay
-            self.window.after(100, self._safe_destroy)
-            
+            if hasattr(self, 'chat_client'):
+                self.chat_client.close()
         except Exception:
-            # If anything fails, force quit
+            pass  # Ignore any errors here
+            
+        # Use a clean approach to destroy the window
+        try:
+            # This avoids CustomTkinter's internal problems during destroy
             self.window.quit()
+        except Exception:
+            pass
+
+    def run(self):
+        self.window.mainloop()
 
     def _safe_destroy(self):
         """Final destruction step that handles any remaining cleanup"""
