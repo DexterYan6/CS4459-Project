@@ -23,8 +23,6 @@ class ChatService(chatservice_pb2_grpc.ChatServiceServicer):
         HEARTBEAT_TIMEOUT = 15  
         
         while True:
-            time.sleep(HEARTBEAT_TIMEOUT = 15)  # Check every 15 seconds
-            
             current_time = time.time()
             users_to_remove = []
             

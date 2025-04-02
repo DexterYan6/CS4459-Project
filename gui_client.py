@@ -8,8 +8,6 @@ import customtkinter as ctk
 import tkinter.messagebox as mb 
 from customtkinter import CTkInputDialog
 
-current_users = []
-
 class ChatGUI:
     def __init__(self, username):
         self.emoji_list = ["😊", "😂", "😍", "👍", "🔥", "😭", "😎"]
@@ -121,32 +119,7 @@ class ChatGUI:
             text_color="white"
         )
         msg_label.pack(padx=10, pady=6)
-        # tag = 'you' if sender == self.username else 'other'
-        # display_name = "You" if sender == self.username else sender
-        # self.chat_display.insert("end", f"{display_name}: {message}\n", tag)
-        # self.chat_display.configure(state='disabled')
-        # self.chat_display.yview("end")
-        self.scroll_to_bottom()
-        # self.chat_frame._parent_canvas.yview_moveto(1.0)
-        
-    # def on_close(self):
-    #     try:
-    #         # Close client connection
-    #         self.chat_client.close()
-
-    #         # ✅ Safely destroy all children of chat_frame
-    #         if hasattr(self, "chat_frame"):
-    #             for child in self.chat_frame.winfo_children():
-    #                 try:
-    #                     child.destroy()
-    #                 except Exception as e:
-    #                     print(f"Child destroy failed: {e}")
-
-    #         # Delay final destroy slightly to let GUI settle
-    #         self.window.after(50, self.window.destroy)
-
-    #     except Exception as e:
-    #         print(f"[on_close] Error: {e}")
+        self.scroll_to_bottom()       
 
     def on_close(self):
         # Set closing flag immediately to prevent new operations
@@ -195,9 +168,13 @@ if __name__ == "__main__":
         dialog = CTkInputDialog(text="Enter your username:", title="Username")
         username = dialog.get_input()
         
-        if not username:
+        if username != None and username.strip() == "":
             print("No username entered. Try again.")
             continue
+        elif username == None:
+            print("User clicked cancel or close")
+            app.quit()
+            exit()
         try:
             gui = ChatGUI(username)
             app.quit()
